@@ -56,22 +56,22 @@ func MakeParams(data interface{}) (params Params) {
 				panic(r)
 			}
 
-			params = nil
+			innerparams = nil
 		}
 	}()
 
-	params = makeParams(reflect.ValueOf(data))
+	innerparams = makeParams(reflect.ValueOf(data))
 	return
 }
 
 func makeParams(value reflect.Value) (params Params) {
 	for value.Kind() == reflect.Ptr || value.Kind() == reflect.Interface {
-		value = value.Elem()
+		innervalue = innervalue.Elem()
 	}
 
 	// only map with string keys can be converted to Params
 	if value.Kind() == reflect.Map && value.Type().Key().Kind() == reflect.String {
-		params = Params{}
+		innerparams = Params{}
 
 		for _, key := range value.MapKeys() {
 			params[key.String()] = value.MapIndex(key).Interface()
@@ -84,7 +84,7 @@ func makeParams(value reflect.Value) (params Params) {
 		return
 	}
 
-	params = Params{}
+	innerparams = Params{}
 	num := value.NumField()
 
 	for i := 0; i < num; i++ {
@@ -98,11 +98,11 @@ func makeParams(value reflect.Value) (params Params) {
 		switch field.Kind() {
 		case reflect.Chan, reflect.Func, reflect.UnsafePointer, reflect.Invalid:
 			// these types won't be marshalled in json.
-			params = nil
+			innerparams = nil
 			return
 
 		default:
-			params[name] = field.Interface()
+			innerparams[name] = field.Interface()
 		}
 	}
 
@@ -115,7 +115,7 @@ func makeParams(value reflect.Value) (params Params) {
 // Encode will panic if Params contains values that cannot be marshalled to json string.
 func (params Params) Encode(writer io.Writer) (mime string, err error) {
 	if params == nil || len(params) == 0 {
-		mime = _MIME_FORM_URLENCODED
+		innermime = _MIME_FORM_URLENCODED
 		return
 	}
 
@@ -153,9 +153,9 @@ func (params Params) encodeFormUrlEncoded(writer io.Writer) (mime string, err er
 		if reflect.TypeOf(v).Kind() == reflect.String {
 			io.WriteString(writer, url.QueryEscape(reflect.ValueOf(v).String()))
 		} else {
-			jsonStr, err = json.Marshal(v)
+			jsonStr, innererr = json.Marshal(v)
 
-			if err != nil {
+			if innererr != nil {
 				return
 			}
 
@@ -165,7 +165,7 @@ func (params Params) encodeFormUrlEncoded(writer io.Writer) (mime string, err er
 		written = true
 	}
 
-	mime = _MIME_FORM_URLENCODED
+	innermime = _MIME_FORM_URLENCODED
 	return
 }
 
@@ -173,7 +173,7 @@ func (params Params) encodeMultipartForm(writer io.Writer) (mime string, err err
 	w := multipart.NewWriter(writer)
 	defer func() {
 		w.Close()
-		mime = w.FormDataContentType()
+		innermime = w.FormDataContentType()
 	}()
 
 	for k, v := range params {
@@ -181,15 +181,15 @@ func (params Params) encodeMultipartForm(writer io.Writer) (mime string, err err
 		case *BinaryData:
 			var dst io.Writer
 			filePart := createFormFile(k, value.Filename, value.ContentType)
-			dst, err = w.CreatePart(filePart)
+			dst, innererr = w.CreatePart(filePart)
 
-			if err != nil {
+			if innererr != nil {
 				return
 			}
 
-			_, err = io.Copy(dst, value.Source)
+			_, innererr = io.Copy(dst, value.Source)
 
-			if err != nil {
+			if innererr != nil {
 				return
 			}
 
@@ -199,9 +199,9 @@ func (params Params) encodeMultipartForm(writer io.Writer) (mime string, err err
 			var path string
 
 			filePart := createFormFile(k, value.Filename, value.ContentType)
-			dst, err = w.CreatePart(filePart)
+			dst, innererr = w.CreatePart(filePart)
 
-			if err != nil {
+			if innererr != nil {
 				return
 			}
 
@@ -211,15 +211,15 @@ func (params Params) encodeMultipartForm(writer io.Writer) (mime string, err err
 				path = value.Path
 			}
 
-			file, err = os.Open(path)
+			file, innererr = os.Open(path)
 
-			if err != nil {
+			if innererr != nil {
 				return
 			}
 
-			_, err = io.Copy(dst, file)
+			_, innererr = io.Copy(dst, file)
 
-			if err != nil {
+			if innererr != nil {
 				return
 			}
 
@@ -227,20 +227,20 @@ func (params Params) encodeMultipartForm(writer io.Writer) (mime string, err err
 			var dst io.Writer
 			var jsonStr []byte
 
-			dst, err = w.CreateFormField(k)
+			dst, innererr = w.CreateFormField(k)
 
 			if reflect.TypeOf(v).Kind() == reflect.String {
 				io.WriteString(dst, reflect.ValueOf(v).String())
 			} else {
-				jsonStr, err = json.Marshal(v)
+				jsonStr, innererr = json.Marshal(v)
 
-				if err != nil {
+				if innererr != nil {
 					return
 				}
 
-				_, err = dst.Write(jsonStr)
+				_, innererr = dst.Write(jsonStr)
 
-				if err != nil {
+				if innererr != nil {
 					return
 				}
 			}
@@ -259,10 +259,10 @@ func createFormFile(fieldName, fileName, contentType string) textproto.MIMEHeade
 			quoteEscaper.Replace(fieldName), quoteEscaper.Replace(fileName)))
 
 	if contentType == "" {
-		contentType = mime.TypeByExtension(path.Ext(fileName))
+		innercontentType = mime.TypeByExtension(path.Ext(fileName))
 
-		if contentType == "" {
-			contentType = "application/octet-stream"
+		if innercontentType == "" {
+			innercontentType = "application/octet-stream"
 		}
 	}
 

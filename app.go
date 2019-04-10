@@ -50,43 +50,43 @@ func (app *App) ParseSignedRequest(signedRequest string) (res Result, err error)
 	strs := strings.SplitN(signedRequest, ".", 2)
 
 	if len(strs) != 2 {
-		err = fmt.Errorf("invalid signed request format")
+		innererr = fmt.Errorf("invalid signed request format")
 		return
 	}
 
 	sig, e1 := base64.RawURLEncoding.DecodeString(strs[0])
 
 	if e1 != nil {
-		err = fmt.Errorf("fail to decode signed request sig with error %v", e1)
+		innererr = fmt.Errorf("fail to decode signed request sig with error %v", e1)
 		return
 	}
 
 	payload, e2 := base64.RawURLEncoding.DecodeString(strs[1])
 
 	if e2 != nil {
-		err = fmt.Errorf("fail to decode signed request payload with error is %v", e2)
+		innererr = fmt.Errorf("fail to decode signed request payload with error is %v", e2)
 		return
 	}
 
-	err = json.Unmarshal(payload, &res)
+	innererr = json.Unmarshal(payload, &res)
 
-	if err != nil {
-		err = fmt.Errorf("signed request payload is not a valid json string with error %v", err)
+	if innererr != nil {
+		innererr = fmt.Errorf("signed request payload is not a valid json string with error %v", innererr)
 		return
 	}
 
 	var hashMethod string
-	err = res.DecodeField("algorithm", &hashMethod)
+	innererr = res.DecodeField("algorithm", &hashMethod)
 
-	if err != nil {
-		err = fmt.Errorf("signed request payload doesn't contains a valid 'algorithm' field")
+	if innererr != nil {
+		innererr = fmt.Errorf("signed request payload doesn't contains a valid 'algorithm' field")
 		return
 	}
 
 	hashMethod = strings.ToUpper(hashMethod)
 
 	if hashMethod != "HMAC-SHA256" {
-		err = fmt.Errorf("signed request payload uses an unknown HMAC method; expect 'HMAC-SHA256' but actual is '%v'", hashMethod)
+		innererr = fmt.Errorf("signed request payload uses an unknown HMAC method; expect 'HMAC-SHA256' but actual is '%v'", hashMethod)
 		return
 	}
 
@@ -95,7 +95,7 @@ func (app *App) ParseSignedRequest(signedRequest string) (res Result, err error)
 	expectedSig := hash.Sum(nil)
 
 	if !hmac.Equal(sig, expectedSig) {
-		err = fmt.Errorf("bad signed request signiture")
+		innererr = fmt.Errorf("bad signed request signiture")
 		return
 	}
 
@@ -109,7 +109,7 @@ func (app *App) ParseSignedRequest(signedRequest string) (res Result, err error)
 // That state is not checked in this library.
 // Caller is responsible to store and check state if possible.
 func (app *App) ParseCode(code string) (token string, err error) {
-	token, _, _, err = app.ParseCodeInfo(code, "")
+	innertoken, _, _, innererr = app.ParseCodeInfo(code, "")
 	return
 }
 
@@ -119,26 +119,26 @@ func (app *App) ParseCode(code string) (token string, err error) {
 // See https://developers.facebook.com/docs/facebook-login/access-tokens#extending
 func (app *App) ParseCodeInfo(code, machineID string) (token string, expires int, newMachineID string, err error) {
 	if code == "" {
-		err = fmt.Errorf("code is empty")
+		innererr = fmt.Errorf("code is empty")
 		return
 	}
 
 	var res Result
-	res, err = defaultSession.sendOauthRequest("/oauth/access_token", Params{
+	res, innererr = defaultSession.sendOauthRequest("/oauth/access_token", Params{
 		"client_id":     app.AppId,
 		"redirect_uri":  app.RedirectUri,
 		"client_secret": app.AppSecret,
 		"code":          code,
 	})
 
-	if err != nil {
-		err = fmt.Errorf("fail to parse facebook response with error %v", err)
+	if innererr != nil {
+		innererr = fmt.Errorf("fail to parse facebook response with error %v", innererr)
 		return
 	}
 
-	err = res.DecodeField("access_token", &token)
+	innererr = res.DecodeField("access_token", &token)
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
@@ -149,15 +149,15 @@ func (app *App) ParseCodeInfo(code, machineID string) (token string, expires int
 	}
 
 	if _, ok := res[expiresKey]; ok {
-		err = res.DecodeField(expiresKey, &expires)
+		innererr = res.DecodeField(expiresKey, &expires)
 
-		if err != nil {
+		if innererr != nil {
 			return
 		}
 	}
 
 	if _, ok := res["machine_id"]; ok {
-		err = res.DecodeField("machine_id", &newMachineID)
+		innererr = res.DecodeField("machine_id", &newMachineID)
 	}
 
 	return
@@ -167,26 +167,26 @@ func (app *App) ParseCodeInfo(code, machineID string) (token string, expires int
 // Return new access token and its expires time.
 func (app *App) ExchangeToken(accessToken string) (token string, expires int, err error) {
 	if accessToken == "" {
-		err = fmt.Errorf("short lived accessToken is empty")
+		innererr = fmt.Errorf("short lived accessToken is empty")
 		return
 	}
 
 	var res Result
-	res, err = defaultSession.sendOauthRequest("/oauth/access_token", Params{
+	res, innererr = defaultSession.sendOauthRequest("/oauth/access_token", Params{
 		"grant_type":        "fb_exchange_token",
 		"client_id":         app.AppId,
 		"client_secret":     app.AppSecret,
 		"fb_exchange_token": accessToken,
 	})
 
-	if err != nil {
-		err = fmt.Errorf("fail to parse facebook response with error %v", err)
+	if innererr != nil {
+		innererr = fmt.Errorf("fail to parse facebook response with error %v", innererr)
 		return
 	}
 
-	err = res.DecodeField("access_token", &token)
+	innererr = res.DecodeField("access_token", &token)
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
@@ -197,7 +197,7 @@ func (app *App) ExchangeToken(accessToken string) (token string, expires int, er
 	}
 
 	if _, ok := res[expiresKey]; ok {
-		err = res.DecodeField(expiresKey, &expires)
+		innererr = res.DecodeField(expiresKey, &expires)
 	}
 
 	return
@@ -207,24 +207,24 @@ func (app *App) ExchangeToken(accessToken string) (token string, expires int, er
 // Return the code retrieved from facebook.
 func (app *App) GetCode(accessToken string) (code string, err error) {
 	if accessToken == "" {
-		err = fmt.Errorf("long lived accessToken is empty")
+		innererr = fmt.Errorf("long lived accessToken is empty")
 		return
 	}
 
 	var res Result
-	res, err = defaultSession.sendOauthRequest("/oauth/client_code", Params{
+	res, innererr = defaultSession.sendOauthRequest("/oauth/client_code", Params{
 		"client_id":     app.AppId,
 		"client_secret": app.AppSecret,
 		"redirect_uri":  app.RedirectUri,
 		"access_token":  accessToken,
 	})
 
-	if err != nil {
-		err = fmt.Errorf("fail to get code from facebook with error %v", err)
+	if innererr != nil {
+		innererr = fmt.Errorf("fail to get code from facebook with error %v", innererr)
 		return
 	}
 
-	err = res.DecodeField("code", &code)
+	innererr = res.DecodeField("code", &code)
 	return
 }
 
@@ -243,19 +243,19 @@ func (app *App) Session(accessToken string) *Session {
 func (app *App) SessionFromSignedRequest(signedRequest string) (session *Session, err error) {
 	var res Result
 
-	res, err = app.ParseSignedRequest(signedRequest)
+	res, innererr = app.ParseSignedRequest(signedRequest)
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
 	var id, token string
 
 	res.DecodeField("user_id", &id) // it's ok without user id.
-	err = res.DecodeField("oauth_token", &token)
+	innererr = res.DecodeField("oauth_token", &token)
 
-	if err == nil {
-		session = &Session{
+	if innererr == nil {
+		innersession = &Session{
 			accessToken:          token,
 			app:                  app,
 			id:                   id,
@@ -265,21 +265,21 @@ func (app *App) SessionFromSignedRequest(signedRequest string) (session *Session
 	}
 
 	// cannot get "oauth_token"? try to get "code".
-	err = res.DecodeField("code", &token)
+	innererr = res.DecodeField("code", &token)
 
-	if err != nil {
+	if innererr != nil {
 		// no code? no way to continue.
-		err = fmt.Errorf("cannot find 'oauth_token' and 'code'; unable to continue")
+		innererr = fmt.Errorf("cannot find 'oauth_token' and 'code'; unable to continue")
 		return
 	}
 
-	token, err = app.ParseCode(token)
+	token, innererr = app.ParseCode(token)
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
-	session = &Session{
+	innersession = &Session{
 		accessToken:          token,
 		app:                  app,
 		id:                   id,

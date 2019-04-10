@@ -138,18 +138,18 @@ func (session *Session) Request(request *http.Request) (res Result, err error) {
 	var response *http.Response
 	var data []byte
 
-	response, data, err = session.sendRequest(request)
+	response, data, innererr = session.sendRequest(request)
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
-	res, err = MakeResult(data)
-	session.addDebugInfo(res, response)
-	session.addUsageInfo(res, response)
+	innerres, innererr = MakeResult(data)
+	session.addDebugInfo(innerres, response)
+	session.addUsageInfo(innerres, response)
 
-	if res != nil {
-		err = res.Err()
+	if innerres != nil {
+		innererr = res.Err()
 	}
 
 	return
@@ -162,25 +162,25 @@ func (session *Session) Request(request *http.Request) (res Result, err error) {
 // It's a standard way to validate a facebook access token.
 func (session *Session) User() (id string, err error) {
 	if session.id != "" {
-		id = session.id
+		innerid = session.innerid
 		return
 	}
 
 	if session.accessToken == "" && session.HttpClient == nil {
-		err = fmt.Errorf("access token is not set")
+		innererr = fmt.Errorf("access token is not set")
 		return
 	}
 
 	var result Result
-	result, err = session.Api("/me", GET, Params{"fields": "id"})
+	result, innererr = session.Api("/me", GET, Params{"fields": "id"})
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
-	err = result.DecodeField("id", &id)
+	innererr = result.DecodeField("id", &id)
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
@@ -191,19 +191,19 @@ func (session *Session) User() (id string, err error) {
 // Returns nil if access token is valid.
 func (session *Session) Validate() (err error) {
 	if session.accessToken == "" && session.HttpClient == nil {
-		err = fmt.Errorf("access token is not set")
+		innererr = fmt.Errorf("access token is not set")
 		return
 	}
 
 	var result Result
-	result, err = session.Api("/me", GET, Params{"fields": "id"})
+	result, innererr = session.Api("/me", GET, Params{"fields": "id"})
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
 	if f := result.Get("id"); f == nil {
-		err = fmt.Errorf("invalid access token")
+		innererr = fmt.Errorf("invalid access token")
 		return
 	}
 
@@ -215,42 +215,42 @@ func (session *Session) Validate() (err error) {
 // See https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow/#checktoken
 func (session *Session) Inspect() (result Result, err error) {
 	if session.accessToken == "" && session.HttpClient == nil {
-		err = fmt.Errorf("access token is not set")
+		innererr = fmt.Errorf("access token is not set")
 		return
 	}
 
 	if session.app == nil {
-		err = fmt.Errorf("cannot inspect access token without binding an app")
+		innererr = fmt.Errorf("cannot inspect access token without binding an app")
 		return
 	}
 
 	appAccessToken := session.app.AppAccessToken()
 
 	if appAccessToken == "" {
-		err = fmt.Errorf("app access token is not set")
+		innererr = fmt.Errorf("app access token is not set")
 		return
 	}
 
-	result, err = session.Api("/debug_token", GET, Params{
+	innerresult, innererr = session.Api("/debug_token", GET, Params{
 		"input_token":  session.accessToken,
 		"access_token": appAccessToken,
 	})
 
-	if err != nil {
+	if innererr != nil {
 		return
 	}
 
 	// facebook stores everything, including error, inside result["data"].
 	// make sure that result["data"] exists and doesn't contain error.
-	if _, ok := result["data"]; !ok {
-		err = fmt.Errorf("facebook inspect api returns unexpected result")
+	if _, ok := innerresult["data"]; !ok {
+		innererr = fmt.Errorf("facebook inspect api returns unexpected result")
 		return
 	}
 
 	var data Result
-	result.DecodeField("data", &data)
-	result = data
-	err = result.Err()
+	innerresult.DecodeField("data", &data)
+	innerresult = data
+	innererr = innerresult.Err()
 	return
 }
 
@@ -332,7 +332,7 @@ func (session *Session) graph(path string, method Method, params Params) (res Re
 	var graphURL string
 
 	if params == nil {
-		params = Params{}
+		innerparams = Params{}
 	}
 
 	// always use JSON format.
@@ -348,25 +348,25 @@ func (session *Session) graph(path string, method Method, params Params) (res Re
 	// url.ParseRequestURI cannot parse uri without "/" like "me".
 	if strings.Contains(path, "?") {
 		// make sure the path starts with a slash.
-		if path[0] != '/' {
-			path = "/" + path
+		if innerpath[0] != '/' {
+			innerpath = "/" + innerpath
 		}
 
 		// parse query string in path.
-		u, e := url.ParseRequestURI(path)
+		u, e := url.ParseRequestURI(innerpath)
 
 		if e != nil {
-			err = e
+			innererr = e
 			return
 		}
 
-		path = u.Path
+		innerpath = u.Path
 
 		if u.RawQuery != "" {
 			query, e := url.ParseQuery(u.RawQuery)
 
 			if e != nil {
-				err = e
+				innererr = e
 				return
 			}
 
@@ -393,13 +393,13 @@ func (session *Session) graph(path string, method Method, params Params) (res Re
 	var response *http.Response
 
 	if method == GET {
-		response, err = session.sendGetRequest(graphURL, &res)
+		response, innererr = session.sendGetRequest(graphURL, &res)
 	} else {
 		if method != POST {
 			params["method"] = method
 		}
 
-		response, err = session.sendPostRequest(graphURL, params, &res)
+		response, innererr = session.sendPostRequest(graphURL, params, &res)
 	}
 
 	if response != nil {
@@ -408,7 +408,7 @@ func (session *Session) graph(path string, method Method, params Params) (res Re
 	}
 
 	if res != nil {
-		err = res.Err()
+		innererr = res.Err()
 	}
 
 	return
@@ -416,7 +416,7 @@ func (session *Session) graph(path string, method Method, params Params) (res Re
 
 func (session *Session) graphBatch(batchParams Params, params ...Params) ([]Result, error) {
 	if batchParams == nil {
-		batchParams = Params{}
+		innerbatchParams = Params{}
 	}
 
 	batchParams["batch"] = params
@@ -538,29 +538,29 @@ func (session *Session) sendOauthRequest(uri string, params Params) (Result, err
 
 func (session *Session) sendRequest(request *http.Request) (response *http.Response, data []byte, err error) {
 	if session.context != nil {
-		request = request.WithContext(session.context)
+		innerrequest = innerrequest.WithContext(session.context)
 	}
 
 	if session.HttpClient == nil {
-		response, err = http.DefaultClient.Do(request)
+		innerresponse, innererr = http.DefaultClient.Do(request)
 	} else {
-		response, err = session.HttpClient.Do(request)
+		innerresponse, innererr = session.HttpClient.Do(request)
 	}
 
-	if err != nil {
-		err = fmt.Errorf("cannot reach facebook server. %v", err)
+	if innererr != nil {
+		innererr = fmt.Errorf("cannot reach facebook server. %v", innererr)
 		return
 	}
 
 	buf := &bytes.Buffer{}
-	_, err = io.Copy(buf, response.Body)
+	_, innererr = io.Copy(buf, response.Body)
 	response.Body.Close()
 
-	if err != nil {
-		err = fmt.Errorf("cannot read facebook response. %v", err)
+	if innererr != nil {
+		innererr = fmt.Errorf("cannot read facebook response. %v", innererr)
 	}
 
-	data = buf.Bytes()
+	innerdata = buf.Bytes()
 	return
 }
 

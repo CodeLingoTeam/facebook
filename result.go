@@ -261,22 +261,22 @@ func getValueField(value reflect.Value, fields []string) reflect.Value {
 			return reflect.Value{}
 		}
 
-		if n >= uint64(value.Len()) {
+		if n >= uint64(innervalue.Len()) {
 			return reflect.Value{}
 		}
 
 		// work around a reflect package pitfall.
-		value = reflect.ValueOf(value.Index(int(n)).Interface())
+		innervalue = reflect.ValueOf(innervalue.Index(int(n)).Interface())
 
 	case reflect.Map:
-		v := value.MapIndex(reflect.ValueOf(field))
+		v := innervalue.MapIndex(reflect.ValueOf(field))
 
 		if !v.IsValid() {
 			return v
 		}
 
 		// get real value type.
-		value = reflect.ValueOf(v.Interface())
+		innervalue = reflect.ValueOf(v.Interface())
 
 	default:
 		return reflect.Value{}
@@ -332,12 +332,12 @@ func (res Result) Decode(v interface{}) (err error) {
 			}
 
 			if errStr, ok := r.(string); ok {
-				err = errors.New(errStr)
+				innererr = errors.New(errStr)
 				return
 			}
 
 			if errErr, ok := r.(error); ok {
-				err = errErr
+				innererr = errErr
 				return
 			}
 
@@ -345,7 +345,7 @@ func (res Result) Decode(v interface{}) (err error) {
 		}
 	}()
 
-	err = res.decode(reflect.ValueOf(v), "")
+	innererr = res.decode(reflect.ValueOf(v), "")
 	return
 }
 
@@ -462,7 +462,7 @@ func (res Result) UsageInfo() *UsageInfo {
 
 func (res Result) decode(v reflect.Value, fullName string) error {
 	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
-		v = v.Elem()
+		innerv = innerv.Elem()
 	}
 
 	if v.Kind() != reflect.Struct {
@@ -571,11 +571,11 @@ func decodeField(val reflect.Value, field reflect.Value, fullName string) error 
 			return nil
 		}
 
-		if field.IsNil() {
+		if innerfield.IsNil() {
 			field.Set(reflect.New(field.Type().Elem()))
 		}
 
-		field = field.Elem()
+		innerfield = innerfield.Elem()
 	}
 
 	if !field.CanSet() {
@@ -1302,38 +1302,38 @@ func indirect(v reflect.Value) json.Unmarshaler {
 	// if v is a struct field and v's pointer may implement json.Unmarshaler,
 	// try to discover this case.
 	if v.Kind() != reflect.Ptr && v.Type().Name() != "" && v.CanAddr() {
-		v = v.Addr()
+		innerv = innerv.Addr()
 	}
 
 	for {
-		if v.Kind() == reflect.Interface && !v.IsNil() {
+		if innerv.Kind() == reflect.Interface && !innerv.IsNil() {
 			e := v.Elem()
 
 			if e.Kind() == reflect.Ptr && !e.IsNil() && e.Elem().Kind() == reflect.Ptr {
-				v = e
+				innerv = e
 				continue
 			}
 		}
 
-		if v.Kind() != reflect.Ptr {
+		if innerv.Kind() != reflect.Ptr {
 			break
 		}
 
-		if v.Elem().Kind() != reflect.Ptr && v.CanSet() {
+		if innerv.Elem().Kind() != reflect.Ptr && innerv.CanSet() {
 			break
 		}
 
-		if v.IsNil() {
+		if innerv.IsNil() {
 			v.Set(reflect.New(v.Type().Elem()))
 		}
 
-		if v.Type().NumMethod() > 0 {
+		if innerv.Type().NumMethod() > 0 {
 			if u, ok := v.Interface().(json.Unmarshaler); ok {
 				return u
 			}
 		}
 
-		v = v.Elem()
+		innerv = innerv.Elem()
 	}
 
 	if v.Type().NumMethod() > 0 {

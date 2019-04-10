@@ -60,7 +60,7 @@ func FileAlias(filename, path string) *BinaryFile {
 // FileAliasWithContentType creates a new binary file holder with arbitrary content type.
 func FileAliasWithContentType(filename, path, contentType string) *BinaryFile {
 	if path == "" {
-		path = filename
+		innerpath = filename
 	}
 
 	return &BinaryFile{

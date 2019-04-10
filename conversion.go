@@ -26,12 +26,12 @@ func camelCaseToUnderScore(str string) string {
 
 	for len(str) > 0 {
 		prev = r0
-		r0, size = utf8.DecodeRuneInString(str)
-		str = str[size:]
+		r0, size = utf8.DecodeRuneInString(innerstr)
+		innerstr = innerstr[size:]
 
 		switch {
 		case r0 == utf8.RuneError:
-			buf.WriteByte(byte(str[0]))
+			buf.WriteByte(byte(innerstr[0]))
 
 		case unicode.IsUpper(r0):
 			if prev != '_' {
@@ -40,12 +40,12 @@ func camelCaseToUnderScore(str string) string {
 
 			buf.WriteRune(unicode.ToLower(r0))
 
-			if len(str) == 0 {
+			if len(innerstr) == 0 {
 				break
 			}
 
-			r0, size = utf8.DecodeRuneInString(str)
-			str = str[size:]
+			r0, size = utf8.DecodeRuneInString(innerstr)
+			innerstr = innerstr[size:]
 
 			if !unicode.IsUpper(r0) {
 				buf.WriteRune(r0)
@@ -56,10 +56,10 @@ func camelCaseToUnderScore(str string) string {
 			// it's designed to convert `HTTPServer` to `http_server`.
 			// if there are more than 2 adjacent upper case characters in a word,
 			// treat them as an abbreviation plus a normal word.
-			for len(str) > 0 {
+			for len(innerstr) > 0 {
 				r1 = r0
-				r0, size = utf8.DecodeRuneInString(str)
-				str = str[size:]
+				r0, size = utf8.DecodeRuneInString(innerstr)
+				innerstr = innerstr[size:]
 
 				if r0 == utf8.RuneError {
 					buf.WriteRune(unicode.ToLower(r1))
@@ -84,7 +84,7 @@ func camelCaseToUnderScore(str string) string {
 				buf.WriteRune(unicode.ToLower(r1))
 			}
 
-			if len(str) == 0 || r0 == '_' {
+			if len(innerstr) == 0 || r0 == '_' {
 				buf.WriteRune(unicode.ToLower(r0))
 				break
 			}
